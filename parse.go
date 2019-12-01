@@ -12,12 +12,12 @@ func parseCommand(cmd string) string {
 	case "get_ip":
 		return getIP()
 	case "close":
-		return "END\n"
+		return "END"
 	case "ping":
 		fmt.Println("Responding pong")
-		return "pong\n"
+		return "pong"
 	default:
-		return "ERROR: Invalid command\n"
+		return "ERROR: Invalid command"
 	}
 }
 

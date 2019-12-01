@@ -1,10 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"net/textproto"
+	"os"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -25,63 +27,83 @@ func main() {
 	viper.SetConfigType("yaml")
 	port := viper.GetString("port")
 
-	l, err := net.Listen("tcp4", ":"+port)
-	if err != nil {
-		panic(fmt.Errorf("Failed to start listening server: %s \n", err))
-	}
-	defer l.Close()
+	Listen(":" + port)
+}
 
+func Listen(addr string) {
+	ln, err := net.Listen("tcp4", addr)
+	if err != nil {
+		log.Fatalf("Listen failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer ln.Close()
 	for {
-		c, err := l.Accept()
+		c, err := ln.Accept()
 		if err != nil {
 			log.Print("Error: Failed to accept connection")
 		}
-		go handleConnection(c)
+		go handleConnection(textproto.NewConn(c))
 	}
 }
 
-func handleConnection(c net.Conn) {
-	log.Print("Serving %s\n", c.RemoteAddr().String())
-	header, err := bufio.NewReader(c).ReadString('\n')
+func handleConnection(p *textproto.Conn) {
+	id := p.Next()
+	p.StartRequest(id)
+	header, err := p.ReadLine()
+	if err == io.EOF {
+		return 
+	}
 	if err != nil {
-		log.Print("Error: %s", err)
+		log.Printf("reading request failed: %v\n", err)
+		return 
 	}
-	headerFields := strings.Fields(string(header))
-	if len(headerFields) != 2 {
-		log.Print("Error: Received bad header len")
-		c.Write([]byte("ERR: Invalid header len"))
-		c.Close()
+	p.EndRequest(id)
+	hcheck, res := checkHeader(header)
+	p.StartResponse(id)
+	p.PrintfLine(res)
+	p.EndResponse(id)
+	if hcheck == false {
+		p.Close()
 		return
 	}
-	if headerFields[0] != "aelita" {
-		log.Print("Error: Received bad header server")
-		c.Write([]byte("ERR: Invalid header server"))
-		c.Close()
-		return
-	}
-	if headerFields[1] != PROTOV {
-		log.Print("Error: Received bad header version")
-		msg := fmt.Sprintf("ERR: Protocol mismatch: server accepts %s", PROTOV)
-		c.Write([]byte(msg))
-		c.Close()
-		return
-	}
-	msg := fmt.Sprintf("OK aelita %s\n", PROTOV)
-	c.Write([]byte(msg))
+
 	for {
-		cmd, err := bufio.NewReader(c).ReadString('\n')
+		id := p.Next()
+		p.StartRequest(id)
+		cmd, err := p.ReadLine()
+		p.EndRequest(id)
 		if err != nil {
 			log.Print(fmt.Sprintf("Error: %s", err))
 			return
 		}
-		temp := strings.TrimSpace(string(cmd))
-		result := parseCommand(temp)
+		p.StartResponse(id)
+		result := parseCommand(cmd)
 		if result == "END" {
+			p.PrintfLine("END")
+			p.EndResponse(id)
 			break
 		}
-		c.Write([]byte(result))
+		p.PrintfLine(result)
+		p.EndResponse(id)
+
 	}
-	c.Write([]byte("END\n"))
-	c.Close()
+	p.Close()
 	return
+}
+
+func checkHeader(header string) (bool, string) {
+	headerFields := strings.Fields(string(header))
+	if len(headerFields) != 2 {
+		log.Print("Error: Received bad header len")
+		return false, "ERR: Invalid header len"
+	}
+	if headerFields[0] != "aelita" {
+		log.Print("Error: Received bad header server")
+		return false, "ERR: Invalid header server"
+	}
+	if headerFields[1] != PROTOV {
+		log.Print("Error: Received bad header version")
+		return false, "ERR: Protocol mismatch: server accepts " + PROTOV
+	}
+	return true, "OK aelita " + PROTOV
 }
