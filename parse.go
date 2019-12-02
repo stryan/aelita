@@ -7,14 +7,12 @@ import (
 )
 
 func parseCommand(cmd string) string {
-	fmt.Println(cmd)
 	switch cmd {
 	case "get_ip":
 		return getIP()
 	case "close":
 		return "END"
 	case "ping":
-		fmt.Println("Responding pong")
 		return "pong"
 	default:
 		return "ERROR: Invalid command"
