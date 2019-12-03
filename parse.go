@@ -1,17 +1,17 @@
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
+	"gopkg.in/yaml.v2"
+	"io/ioutil"
+	"log"
 )
 
 func parseCommand(cmd string, ael *Controller) string {
-	cmd_s := strings.Split(cmd," ")
+	cmd_s := strings.Split(cmd, " ")
 	com := ael.FindAction(cmd_s[0])
 	if com.GetName() != "nil" {
-		return com.Run(ael,cmd_s[1:]...)
+		return com.Run(ael, cmd_s[1:]...)
 	}
 	// Not in action list, check built in
 	switch cmd_s[0] {
@@ -24,15 +24,24 @@ func parseCommand(cmd string, ael *Controller) string {
 	}
 }
 
-func GetIP(ael *Controller, args ...string) string {
-	resp, err := http.Get("https://ifconfig.co")
+type YAMLCommand struct {
+	Inputs []string `yaml:",flow"`
+	Outputs []string `yaml:",flow"`
+	Action string `yaml:",flow"`
+}
+
+
+func parseYAMLCommand(filename string) *ExternalCommand{
+	y := YAMLCommand{}
+	fileData, err := ioutil.ReadFile(filename)
 	if err != nil {
-		fmt.Println("TODO: Handle error %s",err)
+		log.Printf("Error reading external file %s: %v",filename,err)
+		return nil
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	err = yaml.Unmarshal(fileData, &y)
 	if err != nil {
-		fmt.Println("TODO: Handle body read error")
+                log.Printf("error: %v", err)
+		return nil
 	}
-	return string(body)
+	return NewExternalCommand(y.Inputs,y.Outputs,y.Action)
 }

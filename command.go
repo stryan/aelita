@@ -1,11 +1,19 @@
 package main
 
+import (
+	"bytes"
+	"os"
+	"os/exec"
+	"log"
+)
+
 type CommandAction func(*Controller, ...string) string
 type CommandType int
+
 const (
 	INTERNAL = 0
 	EXTERNAL = 1
-	NIL = 2
+	NIL      = 2
 )
 
 type Command interface {
@@ -17,36 +25,34 @@ type Command interface {
 }
 
 type InternalCommand struct {
-	Inputs []string
-	Outputs []string
+	Inputs     []string
+	Outputs    []string
 	ActionName string
-	Action CommandAction
+	Action     CommandAction
 }
 
 type ExternalCommand struct {
-	Inputs []string
-	Outputs []string
+	Inputs     []string
+	Outputs    []string
 	ActionName string
 }
 
 type NilCommand struct {
-	Inputs []string
-	Outputs []string
+	Inputs     []string
+	Outputs    []string
 	ActionName string
 }
 
-
-
 func NewNilCommand() *NilCommand {
-	return &NilCommand{[]string{},[]string{},"nil"}
+	return &NilCommand{[]string{}, []string{}, "nil"}
 }
 
-func NewInternalCommand(inputs []string,outputs []string,name string, action CommandAction) *InternalCommand {
-	return &InternalCommand{inputs,outputs,name,action}
+func NewInternalCommand(inputs []string, outputs []string, name string, action CommandAction) *InternalCommand {
+	return &InternalCommand{inputs, outputs, name, action}
 }
 
 func NewExternalCommand(inputs []string, outputs []string, name string) *ExternalCommand {
-	return &ExternalCommand{inputs,outputs,name}
+	return &ExternalCommand{inputs, outputs, name}
 }
 
 func (i *InternalCommand) GetType() CommandType {
@@ -102,7 +108,18 @@ func (i *InternalCommand) Run(ael *Controller, args ...string) string {
 }
 
 func (e *ExternalCommand) Run(ael *Controller, args ...string) string {
-	return "No External Commands"
+	cmd := exec.Command(e.ActionName, args...)
+	cmd.Env = os.Environ()
+	var out,cmdErr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &cmdErr
+	err := cmd.Run()
+	if err != nil {
+		log.Printf("Unable to run external command: '%v'", err)
+		log.Printf("Command '%v' error: %v",e.ActionName,cmdErr.String())
+		return "nil"
+	}
+	return out.String()
 }
 
 func (n *NilCommand) Run(ael *Controller, args ...string) string {

@@ -1,5 +1,7 @@
 package main
 
+import "log"
+
 type Controller struct {
 	inputs  map[string]Command
 	outputs map[string]Command
@@ -14,7 +16,35 @@ func NewController() *Controller {
 	return &c
 }
 
+func (c *Controller) LogCommands() {
+	inputs := make([]string, len(c.inputs))
+	i := 0
+	for k := range c.inputs {
+	    inputs[i] = k
+	    i++
+	}
+	outputs := make([]string, len(c.outputs))
+	i = 0
+	for k := range c.outputs {
+	    outputs[i] = k
+	    i++
+	}
+	actions := make([]string, len(c.actions))
+	i = 0
+	for k := range c.actions {
+	    actions[i] = k
+	    i++
+	}
+	log.Printf("Inputs Available: %v",inputs)
+	log.Printf("Outputs Available: %v",outputs)
+	log.Printf("Actions Available: %v",actions)
+}
+
+
 func (c *Controller) AddCommand(com Command) {
+	if com == nil || com.GetType() == NIL {
+		return
+	}
 	for _, i := range com.GetInputs() {
 		c.inputs[i] = com
 	}
