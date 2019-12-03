@@ -1,7 +1,10 @@
 package main
 
 import (
-	"fmt"
+	"path/filepath"
+	"log"
+	"os"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -16,7 +19,7 @@ func main() {
 	viper.AddConfigPath(".")
 	err := viper.ReadInConfig()
 	if err != nil { // Handle errors reading the config file
-		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+		log.Fatalf("Fatal error config file: %v \n", err)
 	}
 	viper.SetConfigType("yaml")
 	port := viper.GetString("port")
@@ -30,5 +33,18 @@ func main() {
 }
 
 func RegisterExternal(ael *Controller,dir string) {
-	ael.AddCommand(parseYAMLCommand(dir+"/fortune.yaml"))
+	var files []string
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	        files = append(files, path)
+		return nil
+	})
+	if err != nil {
+		log.Print("Failed to add external commands")
+		return
+	}
+	for _, file := range files {
+		if strings.Contains(file, "yaml") {
+			ael.AddCommand(parseYAMLCommand(file))
+		}
+	}
 }

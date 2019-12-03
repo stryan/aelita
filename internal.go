@@ -8,10 +8,8 @@ import (
 )
 
 func RegisterInternal(ael *Controller) {
-	get_c := NewInternalCommand([]string{}, []string{}, "get", Get)
-	get_ip := NewInternalCommand([]string{}, []string{"ip"}, "GetExternalIP", GetIP)
-	ael.AddCommand(get_c)
-	ael.AddCommand(get_ip)
+	ael.AddCommand(NewInternalCommand([]string{}, []string{}, "get", Get))
+	ael.AddCommand(NewInternalCommand([]string{}, []string{"ip"}, "GetExternalIP", GetIP))
 }
 
 func Get(ael *Controller, args ...string) string {
