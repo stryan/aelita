@@ -26,11 +26,12 @@ func main() {
 	}
 	viper.SetConfigType("yaml")
 	port := viper.GetString("port")
-
-	Listen(":" + port)
+	ael := NewController()
+	RegisterInternal(ael)
+	Listen(":" + port,ael)
 }
 
-func Listen(addr string) {
+func Listen(addr string, ael *Controller) {
 	ln, err := net.Listen("tcp4", addr)
 	if err != nil {
 		log.Fatalf("Listen failed: %v\n", err)
@@ -42,11 +43,11 @@ func Listen(addr string) {
 		if err != nil {
 			log.Print("Error: Failed to accept connection")
 		}
-		go handleConnection(textproto.NewConn(c))
+		go handleConnection(textproto.NewConn(c), ael)
 	}
 }
 
-func handleConnection(p *textproto.Conn) {
+func handleConnection(p *textproto.Conn, ael *Controller) {
 	id := p.Next()
 	p.StartRequest(id)
 	header, err := p.ReadLine()
@@ -77,7 +78,7 @@ func handleConnection(p *textproto.Conn) {
 			return
 		}
 		p.StartResponse(id)
-		result := parseCommand(cmd)
+		result := parseCommand(cmd, ael)
 		if result == "END" {
 			p.PrintfLine("END")
 			p.EndResponse(id)
@@ -106,4 +107,11 @@ func checkHeader(header string) (bool, string) {
 		return false, "ERR: Protocol mismatch: server accepts " + PROTOV
 	}
 	return true, "OK aelita " + PROTOV
+}
+
+func RegisterInternal(ael *Controller) {
+	get_c := NewInternalCommand([]string{},[]string{},"get",Get)
+	get_ip := NewInternalCommand([]string{},[]string{"ip"},"GetExternalIP",GetIP)
+	ael.AddCommand(get_c)
+	ael.AddCommand(get_ip)
 }
