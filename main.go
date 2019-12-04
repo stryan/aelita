@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	PROTOV = "0.1"
+	PROTOV = "0.2"
 )
 
 func main() {

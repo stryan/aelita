@@ -117,12 +117,14 @@ func (s *Service) serve(p *textproto.Conn, ael *Controller) {
 			return
 		}
 		p.StartResponse(id)
-		result := parseCommand(cmd, ael)
+		result := parseCommand(cmd[4:], ael)
 		if result == "END" {
-			p.PrintfLine("END")
+			p.PrintfLine("END aelita " + PROTOV)
 			p.EndResponse(id)
 			break
 		}
+		d := 1+strings.Count(result,"\n")
+		p.PrintfLine("DAT %v",d)
 		p.PrintfLine(result)
 		p.EndResponse(id)
 	}
@@ -130,15 +132,19 @@ func (s *Service) serve(p *textproto.Conn, ael *Controller) {
 
 func checkHeader(header string) (bool, string) {
 	headerFields := strings.Fields(string(header))
-	if len(headerFields) != 2 {
+	if len(headerFields) != 3 {
 		log.Print("Error: Received bad header len")
 		return false, "ERR: Invalid header len"
 	}
-	if headerFields[0] != "aelita" {
+	if headerFields[0] != "NEW" {
+		log.Print("Error: Not new connection")
+		return false, "ERR: Not new connection"
+	}
+	if headerFields[1] != "aelita" {
 		log.Print("Error: Received bad header server")
 		return false, "ERR: Invalid header server"
 	}
-	if headerFields[1] != PROTOV {
+	if headerFields[2] != PROTOV {
 		log.Print("Error: Received bad header version")
 		return false, "ERR: Protocol mismatch: server accepts " + PROTOV
 	}
@@ -147,7 +153,7 @@ func checkHeader(header string) (bool, string) {
 
 func CleanUpConnection(p *textproto.Conn) {
 	log.Print("Breaking connection")
-	p.PrintfLine("END")
+	p.PrintfLine("END aelita " + PROTOV)
 }
 
 func CleanUpListener(listener *net.TCPListener) {
