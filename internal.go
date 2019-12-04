@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"log"
 )
 
 func RegisterInternal(ael *Controller) {
