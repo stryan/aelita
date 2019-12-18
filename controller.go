@@ -1,18 +1,24 @@
 package main
 
-import "log"
+import (
+	"strings"
+	"log"
+)
 
 type Controller struct {
 	inputs  map[string]Command
 	outputs map[string]Command
 	actions map[string]Command
+	broadcasts map[int]string
+	bid int
 }
 
 func NewController() *Controller {
 	inputs := make(map[string]Command)
 	outputs := make(map[string]Command)
 	actions := make(map[string]Command)
-	c := Controller{inputs, outputs, actions}
+	bc := make(map[int]string)
+	c := Controller{inputs, outputs, actions, bc,1}
 	return &c
 }
 
@@ -76,5 +82,23 @@ func (c *Controller) FindAction(a string) Command {
 		return val
 	} else {
 		return NewNilCommand()
+	}
+}
+
+func (c *Controller) NewBroadcast(b string) {
+	c.broadcasts[c.bid] = strings.TrimSpace(b)
+	c.bid++
+}
+
+func (c *Controller) GetBroadcast(bid int) string {
+	if bid > 0 {
+		return c.broadcasts[bid]
+	} else {
+		bs := make([]string, 0, len(c.broadcasts))
+		for _,v := range c.broadcasts {
+			bs = append(bs,v)
+		}
+		results := strings.Join(bs, "\n")
+		return results
 	}
 }

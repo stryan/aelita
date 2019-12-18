@@ -19,6 +19,8 @@ func parseCommand(cmd string, ael *Controller) string {
 		return "END"
 	case "ping":
 		return "pong"
+	case "poll":
+		return Poll(ael,cmd_s[1:]...)
 	default:
 		return "ERROR: Invalid command: " + cmd_s[0]
 	}

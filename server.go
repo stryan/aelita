@@ -42,7 +42,7 @@ func (a *AelConn) Close() {
 type Service struct {
 	ch        chan bool
 	waitGroup *sync.WaitGroup
-	openConns []AelConn
+	openConns []*AelConn
 }
 
 func NewService() *Service {
@@ -129,6 +129,7 @@ func (s *Service) Serve(listener *net.TCPListener, ael *Controller) {
 		log.Println(conn.RemoteAddr(), "connected")
 		a := NewAelConn(conn,textproto.NewConn(conn))
 		s.waitGroup.Add(1)
+		s.openConns = append(s.openConns,a)
 		go s.serve(a, ael)
 	}
 }

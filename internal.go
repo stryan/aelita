@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"strconv"
+	"log"
 )
 
 func RegisterInternal(ael *Controller) {
@@ -31,12 +32,30 @@ func Get(ael *Controller, args ...string) string {
 func GetIP(ael *Controller, args ...string) string {
 	resp, err := http.Get("https://ifconfig.co")
 	if err != nil {
-		fmt.Println("TODO: Handle error %s", err)
+		log.Printf("TODO: Handle error %s", err)
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("TODO: Handle body read error")
+		log.Printf("TODO: Handle body read error")
 	}
 	return string(body)
 }
+
+func Poll(ael *Controller, args ...string) string {
+	if len(args) == 0 {
+		return ael.GetBroadcast(0)
+	} else {
+		results := make([]string,len(args))
+		for k,i := range args {
+			bid,_ := strconv.Atoi(i)
+			results[k] = strings.TrimSpace(ael.GetBroadcast(bid))
+		}
+		if len(results) <= 1 {
+			return strings.TrimSpace(results[0])
+		} else {
+			return strings.Join(results,"\n")
+		}
+	}
+}
+

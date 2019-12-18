@@ -29,6 +29,8 @@ func main() {
 	RegisterInternal(ael)
 	RegisterExternal(ael,pluginsDir)
 	ael.LogCommands()
+	ael.NewBroadcast("Hello world!")
+	ael.NewBroadcast("Goodbye World!")
 	StartServer(":"+port, ael)
 }
 
