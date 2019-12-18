@@ -14,9 +14,35 @@ import (
 	"time"
 )
 
+type AelConn struct {
+	C net.Conn
+	P *textproto.Conn
+	Closed bool
+}
+
+func NewAelConn(c net.Conn, p *textproto.Conn) *AelConn {
+	a := &AelConn{
+		C: c,
+		P: p,
+		Closed: false,
+	}
+	return a
+}
+
+func (a *AelConn) Close() {
+	if a.Closed == false {
+		a.C.Close()
+		a.Closed = true
+		return
+	} else {
+		return
+	}
+}
+
 type Service struct {
 	ch        chan bool
 	waitGroup *sync.WaitGroup
+	openConns []AelConn
 }
 
 func NewService() *Service {
@@ -31,8 +57,35 @@ func NewService() *Service {
 func (s *Service) Stop() {
 	close(s.ch)
 	log.Println("Stopping Service")
-	s.waitGroup.Wait()
+	//Try to wait out
+	if waitTimeout(s.waitGroup,10 * time.Second) {
+		//timed out, kill them all
+		log.Print("Closing remaining connections")
+		for _,c := range s.openConns {
+			c.P.PrintfLine("END aelita " + PROTOV)
+			c.Close()
+		}
+	} else {
+		//Everyone's happy!
+		log.Print("All connections closed normally")
+	}
+	log.Println("Service Stopped")
 }
+//https://stackoverflow.com/a/32843750
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+    c := make(chan struct{})
+    go func() {
+        defer close(c)
+        wg.Wait()
+    }()
+    select {
+    case <-c:
+        return false // completed normally
+    case <-time.After(timeout):
+        return true // timed out
+    }
+}
+
 
 func StartServer(addr string, ael *Controller) {
 	laddr, err := net.ResolveTCPAddr("tcp", addr)
@@ -66,7 +119,7 @@ func (s *Service) Serve(listener *net.TCPListener, ael *Controller) {
 		default:
 		}
 		listener.SetDeadline(time.Now().Add(1e9))
-		conn, err := listener.Accept()
+		conn, err := listener.AcceptTCP()
 		if nil != err {
 			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
 				continue
@@ -74,17 +127,19 @@ func (s *Service) Serve(listener *net.TCPListener, ael *Controller) {
 			log.Println(err)
 		}
 		log.Println(conn.RemoteAddr(), "connected")
+		a := NewAelConn(conn,textproto.NewConn(conn))
 		s.waitGroup.Add(1)
-		go s.serve(textproto.NewConn(conn), ael)
+		go s.serve(a, ael)
 	}
 }
 
-func (s *Service) serve(p *textproto.Conn, ael *Controller) {
-	defer p.Close()
+func (s *Service) serve(ac *AelConn, ael *Controller) {
+	defer ac.Close()
 	defer s.waitGroup.Done()
-	id := p.Next()
-	p.StartRequest(id)
-	header, err := p.ReadLine()
+	//conn.SetDeadline(time.Now().Add(1e9))
+	id := ac.P.Next()
+	ac.P.StartRequest(id)
+	header, err := ac.P.ReadLine()
 	if err == io.EOF {
 		return
 	}
@@ -92,41 +147,41 @@ func (s *Service) serve(p *textproto.Conn, ael *Controller) {
 		log.Printf("reading request failed: %v\n", err)
 		return
 	}
-	p.EndRequest(id)
+	ac.P.EndRequest(id)
 	hcheck, res := checkHeader(header)
-	p.StartResponse(id)
-	p.PrintfLine(res)
-	p.EndResponse(id)
+	ac.P.StartResponse(id)
+	ac.P.PrintfLine(res)
+	ac.P.EndResponse(id)
 	if hcheck == false {
-		p.Close()
+		ac.Close()
 		return
 	}
 	for {
 		select {
 		case <-s.ch:
-			CleanUpConnection(p)
+			CleanUpConnection(ac)
 			return
 		default:
 		}
-		id := p.Next()
-		p.StartRequest(id)
-		cmd, err := p.ReadLine()
-		p.EndRequest(id)
+		id := ac.P.Next()
+		ac.P.StartRequest(id)
+		cmd, err := ac.P.ReadLine()
+		ac.P.EndRequest(id)
 		if err != nil {
 			log.Print(fmt.Sprintf("Error: %s", err))
 			return
 		}
-		p.StartResponse(id)
+		ac.P.StartResponse(id)
 		result := parseCommand(cmd[4:], ael)
 		if result == "END" {
-			p.PrintfLine("END aelita " + PROTOV)
-			p.EndResponse(id)
+			ac.P.PrintfLine("END aelita " + PROTOV)
+			ac.P.EndResponse(id)
 			break
 		}
 		d := 1+strings.Count(result,"\n")
-		p.PrintfLine("DAT %v",d)
-		p.PrintfLine(result)
-		p.EndResponse(id)
+		ac.P.PrintfLine("DAT %v",d)
+		ac.P.PrintfLine(result)
+		ac.P.EndResponse(id)
 	}
 }
 
@@ -151,9 +206,9 @@ func checkHeader(header string) (bool, string) {
 	return true, "OK aelita " + PROTOV
 }
 
-func CleanUpConnection(p *textproto.Conn) {
+func CleanUpConnection(a *AelConn) {
 	log.Print("Breaking connection")
-	p.PrintfLine("END aelita " + PROTOV)
+	a.P.PrintfLine("END aelita " + PROTOV)
 }
 
 func CleanUpListener(listener *net.TCPListener) {
