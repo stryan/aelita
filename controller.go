@@ -1,16 +1,19 @@
 package main
 
 import (
-	"strings"
 	"log"
+	"strings"
+
+	"github.com/robfig/cron/v3"
 )
 
 type Controller struct {
-	inputs  map[string]Command
-	outputs map[string]Command
-	actions map[string]Command
+	inputs     map[string]Command
+	outputs    map[string]Command
+	actions    map[string]Command
+	cron       *cron.Cron
 	broadcasts map[int]string
-	bid int
+	bid        int
 }
 
 func NewController() *Controller {
@@ -18,34 +21,38 @@ func NewController() *Controller {
 	outputs := make(map[string]Command)
 	actions := make(map[string]Command)
 	bc := make(map[int]string)
-	c := Controller{inputs, outputs, actions, bc,1}
+	cron := cron.New()
+	c := Controller{inputs, outputs, actions, cron, bc, 1}
 	return &c
+}
+
+func (c *Controller) Close() {
+	c.cron.Stop()
 }
 
 func (c *Controller) LogCommands() {
 	inputs := make([]string, len(c.inputs))
 	i := 0
 	for k := range c.inputs {
-	    inputs[i] = k
-	    i++
+		inputs[i] = k
+		i++
 	}
 	outputs := make([]string, len(c.outputs))
 	i = 0
 	for k := range c.outputs {
-	    outputs[i] = k
-	    i++
+		outputs[i] = k
+		i++
 	}
 	actions := make([]string, len(c.actions))
 	i = 0
 	for k := range c.actions {
-	    actions[i] = k
-	    i++
+		actions[i] = k
+		i++
 	}
-	log.Printf("Inputs Available: %v",inputs)
-	log.Printf("Outputs Available: %v",outputs)
-	log.Printf("Actions Available: %v",actions)
+	log.Printf("Inputs Available: %v", inputs)
+	log.Printf("Outputs Available: %v", outputs)
+	log.Printf("Actions Available: %v", actions)
 }
-
 
 func (c *Controller) AddCommand(com Command) {
 	if com == nil || com.GetType() == NIL {
@@ -95,8 +102,8 @@ func (c *Controller) GetBroadcast(bid int) string {
 		return c.broadcasts[bid]
 	} else {
 		bs := make([]string, 0, len(c.broadcasts))
-		for _,v := range c.broadcasts {
-			bs = append(bs,v)
+		for _, v := range c.broadcasts {
+			bs = append(bs, v)
 		}
 		results := strings.Join(bs, "\n")
 		return results
