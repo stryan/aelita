@@ -2,10 +2,10 @@ package main
 
 import (
 	"io/ioutil"
-	"net/http"
-	"strings"
-	"strconv"
 	"log"
+	"net/http"
+	"strconv"
+	"strings"
 )
 
 func RegisterInternal(ael *Controller) {
@@ -46,16 +46,15 @@ func Poll(ael *Controller, args ...string) string {
 	if len(args) == 0 {
 		return ael.GetBroadcast(0)
 	} else {
-		results := make([]string,len(args))
-		for k,i := range args {
-			bid,_ := strconv.Atoi(i)
+		results := make([]string, len(args))
+		for k, i := range args {
+			bid, _ := strconv.Atoi(i)
 			results[k] = strings.TrimSpace(ael.GetBroadcast(bid))
 		}
 		if len(results) <= 1 {
 			return strings.TrimSpace(results[0])
 		} else {
-			return strings.Join(results,"\n")
+			return strings.Join(results, "\n")
 		}
 	}
 }
-

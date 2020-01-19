@@ -3,6 +3,7 @@ module aelita
 go 1.13
 
 require (
+	github.com/chewxy/sexp v0.0.0-20181223234510-461851156c0f
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/spf13/afero v1.2.2 // indirect

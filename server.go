@@ -12,18 +12,20 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/chewxy/sexp"
 )
 
 type AelConn struct {
-	C net.Conn
-	P *textproto.Conn
+	C      net.Conn
+	P      *textproto.Conn
 	Closed bool
 }
 
 func NewAelConn(c net.Conn, p *textproto.Conn) *AelConn {
 	a := &AelConn{
-		C: c,
-		P: p,
+		C:      c,
+		P:      p,
 		Closed: false,
 	}
 	return a
@@ -58,10 +60,10 @@ func (s *Service) Stop() {
 	close(s.ch)
 	log.Println("Stopping Service")
 	//Try to wait out
-	if waitTimeout(s.waitGroup,10 * time.Second) {
+	if waitTimeout(s.waitGroup, 10*time.Second) {
 		//timed out, kill them all
 		log.Print("Closing remaining connections")
-		for _,c := range s.openConns {
+		for _, c := range s.openConns {
 			c.P.PrintfLine("END aelita " + PROTOV)
 			c.Close()
 		}
@@ -71,28 +73,28 @@ func (s *Service) Stop() {
 	}
 	log.Println("Service Stopped")
 }
+
 //https://stackoverflow.com/a/32843750
 func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
-    c := make(chan struct{})
-    go func() {
-        defer close(c)
-        wg.Wait()
-    }()
-    select {
-    case <-c:
-        return false // completed normally
-    case <-time.After(timeout):
-        return true // timed out
-    }
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
 }
-
 
 func StartServer(addr string, ael *Controller) {
 	laddr, err := net.ResolveTCPAddr("tcp", addr)
 	if nil != err {
 		log.Fatalln(err)
 	}
-	ln, err := net.ListenTCP("tcp",laddr)
+	ln, err := net.ListenTCP("tcp", laddr)
 	if err != nil {
 		log.Fatalf("Listen failed: %v\n", err)
 		os.Exit(1)
@@ -127,9 +129,9 @@ func (s *Service) Serve(listener *net.TCPListener, ael *Controller) {
 			log.Println(err)
 		}
 		log.Println(conn.RemoteAddr(), "connected")
-		a := NewAelConn(conn,textproto.NewConn(conn))
+		a := NewAelConn(conn, textproto.NewConn(conn))
 		s.waitGroup.Add(1)
-		s.openConns = append(s.openConns,a)
+		s.openConns = append(s.openConns, a)
 		go s.serve(a, ael)
 	}
 }
@@ -149,7 +151,13 @@ func (s *Service) serve(ac *AelConn, ael *Controller) {
 		return
 	}
 	ac.P.EndRequest(id)
-	hcheck, res := checkHeader(header)
+	sexp_header, sres := sexp.ParseString(header)
+	if sres != nil {
+		log.Println("Error, non S-expression header sent")
+		ac.Close()
+		return
+	}
+	hcheck, res := checkHeader(sexp_header[0].(sexp.List))
 	ac.P.StartResponse(id)
 	ac.P.PrintfLine(res)
 	ac.P.EndResponse(id)
@@ -179,32 +187,38 @@ func (s *Service) serve(ac *AelConn, ael *Controller) {
 			ac.P.EndResponse(id)
 			break
 		}
-		d := 1+strings.Count(result,"\n")
-		ac.P.PrintfLine("DAT %v",d)
+		d := 1 + strings.Count(result, "\n")
+		ac.P.PrintfLine("DAT %v", d)
 		ac.P.PrintfLine(result)
 		ac.P.EndResponse(id)
 	}
 }
 
-func checkHeader(header string) (bool, string) {
-	headerFields := strings.Fields(string(header))
-	if len(headerFields) != 3 {
-		log.Print("Error: Received bad header len")
-		return false, "ERR: Invalid header len"
+// Example: (NEW (aelita 0.2))
+func checkHeader(head sexp.List) (bool, string) {
+	bad_header := "(ERR (\"Bad header \"))"
+
+	if len(head) <= 1 {
+		log.Printf("Error 0: %v\n", len(head))
+		return false, bad_header
 	}
-	if headerFields[0] != "NEW" {
-		log.Print("Error: Not new connection")
-		return false, "ERR: Not new connection"
+	header := sexp.List(head)
+	log.Printf("len: %v\n value: %v\n", len(header), header)
+	if header.LeafCount() < 3 || header.Head().Head() != sexp.Symbol("NEW") {
+		log.Println("Error 1")
+		return false, bad_header
 	}
-	if headerFields[1] != "aelita" {
-		log.Print("Error: Received bad header server")
-		return false, "ERR: Invalid header server"
+	tail := header.Tail()
+	fmt.Printf("%v \n", tail)
+	if tail.LeafCount() < 2 || tail.Head().Head() != sexp.Symbol("aelita") {
+		log.Printf("Error 2")
+		return false, bad_header
 	}
-	if headerFields[2] != PROTOV {
-		log.Print("Error: Received bad header version")
-		return false, "ERR: Protocol mismatch: server accepts " + PROTOV
+	if tail.LeafCount() < 2 || tail.Head().Tail().Head() != sexp.Symbol(PROTOV) {
+		log.Printf("Error 3")
+		return false, "(ERR (\"Bad protocol version\"))"
 	}
-	return true, "OK aelita " + PROTOV
+	return true, "(ACK)"
 }
 
 func CleanUpConnection(a *AelConn) {

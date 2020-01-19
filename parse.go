@@ -1,10 +1,12 @@
 package main
 
 import (
-	"strings"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
+	"strings"
+
+	"github.com/chewxy/sexp"
+	"gopkg.in/yaml.v2"
 )
 
 func parseCommand(cmd string, ael *Controller) string {
@@ -20,30 +22,37 @@ func parseCommand(cmd string, ael *Controller) string {
 	case "ping":
 		return "pong"
 	case "poll":
-		return Poll(ael,cmd_s[1:]...)
+		return Poll(ael, cmd_s[1:]...)
 	default:
 		return "ERROR: Invalid command: " + cmd_s[0]
 	}
 }
 
 type YAMLCommand struct {
-	Inputs []string `yaml:",flow"`
+	Inputs  []string `yaml:",flow"`
 	Outputs []string `yaml:",flow"`
-	Action string `yaml:",flow"`
+	Action  string   `yaml:",flow"`
 }
 
-
-func parseYAMLCommand(filename string) *ExternalCommand{
+func parseYAMLCommand(filename string) *ExternalCommand {
 	y := YAMLCommand{}
 	fileData, err := ioutil.ReadFile(filename)
 	if err != nil {
-		log.Printf("Error reading external file %s: %v",filename,err)
+		log.Printf("Error reading external file %s: %v", filename, err)
 		return nil
 	}
 	err = yaml.Unmarshal(fileData, &y)
 	if err != nil {
-                log.Printf("error: %v", err)
+		log.Printf("error: %v", err)
 		return nil
 	}
-	return NewExternalCommand(y.Inputs,y.Outputs,y.Action)
+	return NewExternalCommand(y.Inputs, y.Outputs, y.Action)
+}
+
+func car(list sexp.List) sexp.List {
+	return list.Head().Head().(sexp.List)
+}
+
+func cdr(list sexp.List) sexp.List {
+	return list.Head().Tail().(sexp.List)
 }

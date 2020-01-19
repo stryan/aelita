@@ -1,0 +1,6 @@
+NEW: Open new connection (NEW (aelita (0.2 NIL)))
+ACK: Acknowledge (ACK NIL)
+CMD: Send command (CMD ("command_name" ( "args"...)))
+DAT: Send data block (DAT ("string containing data"))
+END: End connection (END NIL)
+ERR: Error code and message (ERR (334 ("Error message NIL)))
