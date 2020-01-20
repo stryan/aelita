@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bytes"
-	"os"
-	"os/exec"
-	"log"
+	"github.com/chewxy/sexp"
 )
 
-type CommandAction func(*Controller, ...string) string
+type CommandAction func(*Controller, sexp.Sexp) string
 type CommandType int
 
 const (
@@ -21,7 +18,7 @@ type Command interface {
 	GetInputs() []string
 	GetOutputs() []string
 	GetName() string
-	Run(*Controller, ...string) string
+	Run(*Controller, sexp.Sexp) string
 }
 
 type InternalCommand struct {
@@ -103,25 +100,26 @@ func (n *NilCommand) GetName() string {
 	return n.ActionName
 }
 
-func (i *InternalCommand) Run(ael *Controller, args ...string) string {
-	return i.Action(ael,args...)
+func (i *InternalCommand) Run(ael *Controller, args sexp.Sexp) string {
+	return i.Action(ael, args)
 }
 
-func (e *ExternalCommand) Run(ael *Controller, args ...string) string {
-	cmd := exec.Command(e.ActionName, args...)
-	cmd.Env = os.Environ()
-	var out,cmdErr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &cmdErr
-	err := cmd.Run()
-	if err != nil {
-		log.Printf("Unable to run external command: '%v'", err)
-		log.Printf("Command '%v' error: %v",e.ActionName,cmdErr.String())
-		return "nil"
-	}
-	return out.String()
+func (e *ExternalCommand) Run(ael *Controller, args sexp.Sexp) string {
+	panic("Not implemented")
+	//cmd := exec.Command(e.ActionName, args...)
+	//cmd.Env = os.Environ()
+	//var out, cmdErr bytes.Buffer
+	//cmd.Stdout = &out
+	//cmd.Stderr = &cmdErr
+	//err := cmd.Run()
+	//if err != nil {
+	//	log.Printf("Unable to run external command: '%v'", err)
+	//	log.Printf("Command '%v' error: %v", e.ActionName, cmdErr.String())
+	//	return "nil"
+	//}
+	//return out.String()
 }
 
-func (n *NilCommand) Run(ael *Controller, args ...string) string {
-	return "nil"
+func (n *NilCommand) Run(ael *Controller, args sexp.Sexp) string {
+	return "(DAT (\"NIL\"))"
 }

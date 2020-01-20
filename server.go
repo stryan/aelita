@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/textproto"
@@ -19,6 +18,7 @@ import (
 type AelConn struct {
 	C      net.Conn
 	P      *textproto.Conn
+	Active bool
 	Closed bool
 }
 
@@ -26,6 +26,7 @@ func NewAelConn(c net.Conn, p *textproto.Conn) *AelConn {
 	a := &AelConn{
 		C:      c,
 		P:      p,
+		Active: false,
 		Closed: false,
 	}
 	return a
@@ -140,31 +141,6 @@ func (s *Service) serve(ac *AelConn, ael *Controller) {
 	defer ac.Close()
 	defer s.waitGroup.Done()
 	//conn.SetDeadline(time.Now().Add(1e9))
-	id := ac.P.Next()
-	ac.P.StartRequest(id)
-	header, err := ac.P.ReadLine()
-	if err == io.EOF {
-		return
-	}
-	if err != nil {
-		log.Printf("reading request failed: %v\n", err)
-		return
-	}
-	ac.P.EndRequest(id)
-	sexp_header, sres := sexp.ParseString(header)
-	if sres != nil {
-		log.Println("Error, non S-expression header sent")
-		ac.Close()
-		return
-	}
-	hcheck, res := checkHeader(sexp_header[0].(sexp.List))
-	ac.P.StartResponse(id)
-	ac.P.PrintfLine(res)
-	ac.P.EndResponse(id)
-	if hcheck == false {
-		ac.Close()
-		return
-	}
 	for {
 		select {
 		case <-s.ch:
@@ -181,16 +157,33 @@ func (s *Service) serve(ac *AelConn, ael *Controller) {
 			return
 		}
 		ac.P.StartResponse(id)
-		result := parseCommand(cmd[4:], ael)
-		if result == "END" {
-			ac.P.PrintfLine("END aelita " + PROTOV)
+		sexp, sres := sexp.ParseString(cmd)
+		if sres != nil {
+			ac.P.PrintfLine("(ERR \"invalid s expression \")")
 			ac.P.EndResponse(id)
 			break
 		}
-		d := 1 + strings.Count(result, "\n")
-		ac.P.PrintfLine("DAT %v", d)
-		ac.P.PrintfLine(result)
-		ac.P.EndResponse(id)
+		result := parseCommand(sexp, ael)
+		if result == "(END)" {
+			ac.P.PrintfLine("(ACK)")
+			ac.P.EndResponse(id)
+			break
+		}
+		if result == "ACTIVE" {
+			ac.Active = true
+			ac.P.PrintfLine("(ACK)")
+			ac.P.EndResponse(id)
+			continue
+		}
+		if ac.Active {
+			d := 1 + strings.Count(result, "\n")
+			ac.P.PrintfLine("DAT %v", d)
+			ac.P.PrintfLine(result)
+			ac.P.EndResponse(id)
+		} else {
+			ac.P.PrintfLine("(ERR \"No header exchange\"")
+			ac.P.EndResponse(id)
+		}
 	}
 }
 
@@ -223,7 +216,7 @@ func checkHeader(head sexp.List) (bool, string) {
 
 func CleanUpConnection(a *AelConn) {
 	log.Print("Breaking connection")
-	a.P.PrintfLine("END aelita " + PROTOV)
+	a.P.PrintfLine("(END)")
 }
 
 func CleanUpListener(listener *net.TCPListener) {

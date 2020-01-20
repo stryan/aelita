@@ -1,31 +1,44 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
-	"strings"
 
 	"github.com/chewxy/sexp"
 	"gopkg.in/yaml.v2"
 )
 
-func parseCommand(cmd string, ael *Controller) string {
-	cmd_s := strings.Split(cmd, " ")
-	com := ael.FindAction(cmd_s[0])
-	if com.GetName() != "nil" {
-		return com.Run(ael, cmd_s[1:]...)
+func parseCommand(cmd []sexp.Sexp, ael *Controller) string {
+	if len(cmd) <= 0 {
+		log.Printf("%v %v\n", len(cmd), cmd)
+		panic("Bad command")
 	}
-	// Not in action list, check built in
-	switch cmd_s[0] {
-	case "close":
-		return "END"
-	case "ping":
-		return "pong"
-	case "poll":
-		return Poll(ael, cmd_s[1:]...)
-	default:
-		return "ERROR: Invalid command: " + cmd_s[0]
+	switch fmt.Sprint(cmd[0].Head()) {
+	case "CMD":
+		scmd := cmd[0].Tail().Head()
+		scmd_args := scmd.Tail()
+		com := ael.FindAction(fmt.Sprint(scmd.Head()))
+		if com.GetName() != "nil" {
+			return com.Run(ael, scmd_args)
+		}
+		return "(ERR \"Invalid Command\")"
+	case "DAT":
+		return "(ERR \"Didn't ask for data\")"
+	case "NEW":
+		if ParseHeader(cmd[0]) == true {
+			return "ACTIVE"
+		} else {
+			return "(ERR \"Bad header\")"
+		}
+	case "ERR":
+		return "(ERR \"Only aelita can send errors\")"
+	case "END":
+		return "(END)"
+	case "ACK":
+		return ""
 	}
+	panic("Failed to parse properly!")
 }
 
 type YAMLCommand struct {
@@ -47,12 +60,4 @@ func parseYAMLCommand(filename string) *ExternalCommand {
 		return nil
 	}
 	return NewExternalCommand(y.Inputs, y.Outputs, y.Action)
-}
-
-func car(list sexp.List) sexp.List {
-	return list.Head().Head().(sexp.List)
-}
-
-func cdr(list sexp.List) sexp.List {
-	return list.Head().Tail().(sexp.List)
 }
