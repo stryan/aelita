@@ -2,48 +2,53 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 
 	"github.com/chewxy/sexp"
 )
 
 func RegisterInternal(ael *Controller) {
-	//ael.AddCommand(NewInternalCommand([]string{}, []string{}, "get", Get))
-	//ael.AddCommand(NewInternalCommand([]string{}, []string{"ip"}, "GetExternalIP", GetIP))
+	ael.AddCommand(NewInternalCommand([]string{}, []string{}, "get", Get))
+	ael.AddCommand(NewInternalCommand([]string{}, []string{"ip"}, "GetExternalIP", GetIP))
 	ael.AddCommand(NewInternalCommand([]string{}, []string{}, "ping", ComPing))
-	//ael.AddCommand(NewInternalCommand([]string{}, []string{}, "close", ComClose))
 	//ael.AddCommand(NewInternalCommand([]string{}, []string{}, "poll", ComPoll))
 
 }
 
-//func Get(ael *Controller, args ...string) string {
-//	if len(args) == 0 {
-//		return "No arguments provided"
-//	}
-//	var output []string
-//	for _, a := range args {
-//		get_command := ael.FindOutput(a)
-//		if get_command.GetName() == "nil" {
-//			return "N/A"
-//		}
-//		output = append(output, strings.TrimSpace(get_command.Run(ael, args[1:]...)))
-//	}
-//	result := strings.Join(output, "; ")
-//	return result
-//}
+// (CMD (get (ip) (echo hello)))
+func Get(ael *Controller, args sexp.List) sexp.Sexp {
+	output := sexp.List{sexp.Symbol("DAT")}
+	for _, a := range args {
+		get_command := ael.FindOutput(fmt.Sprint(a.Head()))
+		if get_command.GetName() == "nil" {
+			return sexp.List{}
+		}
+		var av sexp.List
+		if a.Tail() != nil {
+			av = a.Tail().(sexp.List)
+		} else {
+			av = sexp.List{}
+		}
+		cmd_out := get_command.Run(ael, av)
+		output = append(output, cmd_out)
+	}
+	return output
+}
 
-//func GetIP(ael *Controller, args ...string) string {
-//	resp, err := http.Get("https://ifconfig.co")
-//	if err != nil {
-//		log.Printf("TODO: Handle error %s", err)
-//	}
-//	defer resp.Body.Close()
-//	body, err := ioutil.ReadAll(resp.Body)
-//	if err != nil {
-//		log.Printf("TODO: Handle body read error")
-//	}
-//	return string(body)
-//}
+func GetIP(ael *Controller, args sexp.List) sexp.Sexp {
+	resp, err := http.Get("https://ifconfig.co")
+	if err != nil {
+		log.Printf("TODO: Handle error %s", err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("TODO: Handle body read error")
+	}
+	return sexp.Symbol(body)
+}
 
 //func Poll(ael *Controller, args ...string) string {
 //	if len(args) == 0 {
@@ -62,8 +67,8 @@ func RegisterInternal(ael *Controller) {
 //	}
 //}
 
-func ComPing(ael *Controller, args sexp.Sexp) string {
-	return "(DAT \"pong\")"
+func ComPing(ael *Controller, args sexp.List) sexp.Sexp {
+	return sexp.List{sexp.Symbol("DAT"), sexp.Symbol("pong")}
 }
 
 //func ComPoll(ael *Controller, args ...string) string {

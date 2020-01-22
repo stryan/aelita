@@ -1,9 +1,9 @@
 package main
 
 import (
-	"path/filepath"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -27,17 +27,17 @@ func main() {
 
 	ael := NewController()
 	RegisterInternal(ael)
-	RegisterExternal(ael,pluginsDir)
+	RegisterExternal(ael, pluginsDir)
 	ael.LogCommands()
 	ael.NewBroadcast("Hello world!")
 	ael.NewBroadcast("Goodbye World!")
 	StartServer(":"+port, ael)
 }
 
-func RegisterExternal(ael *Controller,dir string) {
+func RegisterExternal(ael *Controller, dir string) {
 	var files []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-	        files = append(files, path)
+		files = append(files, path)
 		return nil
 	})
 	if err != nil {

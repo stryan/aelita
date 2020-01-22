@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func parseCommand(cmd []sexp.Sexp, ael *Controller) string {
+func parseCommand(cmd []sexp.Sexp, ael *Controller) sexp.Sexp {
 	if len(cmd) <= 0 {
 		log.Printf("%v %v\n", len(cmd), cmd)
 		panic("Bad command")
@@ -17,26 +17,32 @@ func parseCommand(cmd []sexp.Sexp, ael *Controller) string {
 	switch fmt.Sprint(cmd[0].Head()) {
 	case "CMD":
 		scmd := cmd[0].Tail().Head()
-		scmd_args := scmd.Tail()
+		var scmd_args sexp.List
+		if scmd.Tail() != nil {
+			scmd_args = scmd.Tail().(sexp.List)
+		} else {
+			scmd_args = sexp.List{}
+		}
 		com := ael.FindAction(fmt.Sprint(scmd.Head()))
 		if com.GetName() != "nil" {
 			return com.Run(ael, scmd_args)
 		}
-		return "(ERR \"Invalid Command\")"
+		return newErr("Invalid Command")
 	case "DAT":
-		return "(ERR \"Didn't ask for data\")"
+		return newErr("Didn't ask for data")
 	case "NEW":
 		if ParseHeader(cmd[0]) == true {
-			return "ACTIVE"
+			res, _ := sexp.SymbolReader("ACTIVE")
+			return sexp.List{res}
 		} else {
-			return "(ERR \"Bad header\")"
+			return newErr("Bad header")
 		}
 	case "ERR":
-		return "(ERR \"Only aelita can send errors\")"
+		return newErr("Only aelita can send errors")
 	case "END":
-		return "(END)"
+		return newEnd()
 	case "ACK":
-		return ""
+		return newEmpty()
 	}
 	panic("Failed to parse properly!")
 }
@@ -60,4 +66,24 @@ func parseYAMLCommand(filename string) *ExternalCommand {
 		return nil
 	}
 	return NewExternalCommand(y.Inputs, y.Outputs, y.Action)
+}
+
+func newErr(msg string) sexp.Sexp {
+	res, _ := sexp.SymbolReader(msg)
+	return sexp.List{sexp.Symbol("ERR"), res}
+}
+
+func newAck() sexp.Sexp {
+	res, _ := sexp.SymbolReader("ACK")
+	return sexp.List{res}
+}
+
+func newEmpty() sexp.Sexp {
+	res, _ := sexp.SymbolReader("")
+	return sexp.List{res}
+}
+
+func newEnd() sexp.Sexp {
+	res, _ := sexp.SymbolReader("END")
+	return sexp.List{res}
 }

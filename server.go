@@ -7,7 +7,6 @@ import (
 	"net/textproto"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -159,59 +158,59 @@ func (s *Service) serve(ac *AelConn, ael *Controller) {
 		ac.P.StartResponse(id)
 		sexp, sres := sexp.ParseString(cmd)
 		if sres != nil {
-			ac.P.PrintfLine("(ERR \"invalid s expression \")")
+			ac.P.PrintfLine(fmt.Sprint(newErr("Invalid s-expression")))
 			ac.P.EndResponse(id)
 			break
 		}
 		result := parseCommand(sexp, ael)
-		if result == "(END)" {
+		output_result := fmt.Sprint(result)
+		log.Println(output_result)
+		if output_result == "(END)" {
 			ac.P.PrintfLine("(ACK)")
 			ac.P.EndResponse(id)
 			break
 		}
-		if result == "ACTIVE" {
+		if output_result == "(ACTIVE)" {
 			ac.Active = true
 			ac.P.PrintfLine("(ACK)")
 			ac.P.EndResponse(id)
 			continue
 		}
 		if ac.Active {
-			d := 1 + strings.Count(result, "\n")
-			ac.P.PrintfLine("DAT %v", d)
-			ac.P.PrintfLine(result)
+			ac.P.PrintfLine(output_result)
 			ac.P.EndResponse(id)
 		} else {
-			ac.P.PrintfLine("(ERR \"No header exchange\"")
+			ac.P.PrintfLine(fmt.Sprint(newErr("No header exchange")))
 			ac.P.EndResponse(id)
 		}
 	}
 }
 
 // Example: (NEW (aelita 0.2))
-func checkHeader(head sexp.List) (bool, string) {
-	bad_header := "(ERR (\"Bad header \"))"
+func checkHeader(head sexp.List) (bool, sexp.Sexp) {
+	bad_header := "Bad header"
 
 	if len(head) <= 1 {
 		log.Printf("Error 0: %v\n", len(head))
-		return false, bad_header
+		return false, newErr(bad_header)
 	}
 	header := sexp.List(head)
 	log.Printf("len: %v\n value: %v\n", len(header), header)
 	if header.LeafCount() < 3 || header.Head().Head() != sexp.Symbol("NEW") {
 		log.Println("Error 1")
-		return false, bad_header
+		return false, newErr(bad_header)
 	}
 	tail := header.Tail()
 	fmt.Printf("%v \n", tail)
 	if tail.LeafCount() < 2 || tail.Head().Head() != sexp.Symbol("aelita") {
 		log.Printf("Error 2")
-		return false, bad_header
+		return false, newErr(bad_header)
 	}
 	if tail.LeafCount() < 2 || tail.Head().Tail().Head() != sexp.Symbol(PROTOV) {
 		log.Printf("Error 3")
-		return false, "(ERR (\"Bad protocol version\"))"
+		return false, newErr("Protocol version mismatch")
 	}
-	return true, "(ACK)"
+	return true, newAck()
 }
 
 func CleanUpConnection(a *AelConn) {
