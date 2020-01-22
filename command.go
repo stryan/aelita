@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -111,8 +110,9 @@ func (i *InternalCommand) Run(ael *Controller, args sexp.List) sexp.Sexp {
 }
 
 func (e *ExternalCommand) Run(ael *Controller, args sexp.List) sexp.Sexp {
-	//panic("Not implemented")
-	cmd := exec.Command(e.ActionName, fmt.Sprint(args))
+
+	//TODO Parse args from sexp, compare with defined inputs
+	cmd := exec.Command(e.ActionName)
 	cmd.Env = os.Environ()
 	var out, cmdErr bytes.Buffer
 	cmd.Stdout = &out

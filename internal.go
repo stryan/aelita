@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/chewxy/sexp"
 )
@@ -47,7 +48,7 @@ func GetIP(ael *Controller, args sexp.List) sexp.Sexp {
 	if err != nil {
 		log.Printf("TODO: Handle body read error")
 	}
-	return sexp.Symbol(body)
+	return sexp.Symbol(strings.TrimSpace(string(body)))
 }
 
 //func Poll(ael *Controller, args ...string) string {
